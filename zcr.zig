@@ -1,5 +1,4 @@
 const std = @import("std");
-const os = std.os;
 const fs = std.fs;
 const mem = std.mem;
 const process = std.process;
@@ -19,23 +18,26 @@ const Color = struct {
 const log_file_path = "/tmp/zcr.logs";
 
 fn logMessage(comptime fmt: []const u8, args: anytype) !void {
-    const file = try fs.cwd().openFile(log_file_path, .{ .mode = .write_only, .open_flags = .{ .append = true } }) orelse
-    try fs.cwd().createFile(log_file_path, .{});
-    defer file.close();
-    const writer = file.writer();
-    const timestamp = std.time.milliTimestamp();
-    try writer.print("[{}] ", .{timestamp});
-    try writer.print(fmt, args);
-    try writer.writeByte('\n');
+    // Try to open the file for writing, create it if it doesn't exist
+    var file = fs.cwd().openFile(log_file_path, .{ .mode = .write_only }) catch |err| switch (err) {
+        error.FileNotFound => try fs.cwd().createFile(log_file_path, .{ .truncate = false }),
+        else => return err,
+    };
+        defer file.close();
+
+        try file.seekFromEnd(0); // Move to end of file for appending
+        const writer = file.writer();
+        const timestamp = std.time.milliTimestamp();
+        try writer.print("[{}] ", .{timestamp});
+        try writer.print(fmt, args);
+        try writer.writeByte('\n');
 }
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-
     try logMessage("Starting zcr execution", .{});
-
     const args = try process.argsAlloc(allocator);
     defer process.argsFree(allocator, args);
 
@@ -97,27 +99,27 @@ fn printHelp() !void {
     const help_text =
     \\{s}zcr - Zenit Linux Package Manager{s}
     \\Usage:
-    \\  {s}zcr install <package>{s}    - Install a package
-    \\  {s}zcr find <package>{s}      - Search for a package
-    \\  {s}zcr remove <package>{s}    - Remove a package
-    \\  {s}zcr update <package>{s}    - Update a specific package
-    \\  {s}zcr update-all{s}          - Update all installed packages
-    \\  {s}zcr autoremove{s}          - Remove temporary files and logs
-    \\  {s}zcr help{s}                - Show this help message
-    \\  {s}zcr how-to-add{s}          - Instructions for adding new repositories
+    \\ {s}zcr install <package>{s} - Install a package
+    \\ {s}zcr find <package>{s} - Search for a package
+    \\ {s}zcr remove <package>{s} - Remove a package
+    \\ {s}zcr update <package>{s} - Update a specific package
+    \\ {s}zcr update-all{s} - Update all installed packages
+    \\ {s}zcr autoremove{s} - Remove temporary files and logs
+    \\ {s}zcr help{s} - Show this help message
+    \\ {s}zcr how-to-add{s} - Instructions for adding new repositories
     \\
     ;
-    try std.io.getStdOut().writer().print(help_text, .{ Color.cyan, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset });
+    try std.io.getStdOut().writer().print(help_text, .{ Color.cyan, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset, Color.green, Color.reset });
 }
 
 fn printHowToAdd() !void {
     const how_to_add_text =
     \\{s}How to Add a Repository to zcr{s}
     \\You can contribute your own repository to zcr by submitting it to:
-    \\  - {s}Issues: https://github.com/Zenit-Linux/zcr/issues{s}
-    \\  - {s}Discussions: https://github.com/Zenit-Linux/zcr/discussions{s}
+    \\ - {s}Issues: https://github.com/Zenit-Linux/zcr/issues{s}
+    \\ - {s}Discussions: https://github.com/Zenit-Linux/zcr/discussions{s}
     \\Please read the documentation for more details:
-    \\  - {s}https://github.com/Zenit-Linux/zcr/blob/main/README.md{s}
+    \\ - {s}https://github.com/Zenit-Linux/zcr/blob/main/README.md{s}
     \\
     ;
     try std.io.getStdOut().writer().print(how_to_add_text, .{ Color.cyan, Color.reset, Color.blue, Color.reset, Color.blue, Color.reset, Color.blue, Color.reset });
@@ -127,33 +129,29 @@ fn fetchRepoList(allocator: Allocator) ![]u8 {
     const repo_url = "https://raw.githubusercontent.com/Zenit-Linux/zcr/main/library/repo-list.zcr";
     try std.io.getStdOut().writer().print("{s}Fetching repository list...{s}\n", .{ Color.yellow, Color.reset });
     try logMessage("Fetching repo list from {s}", .{repo_url});
-
     var child = std.process.Child.init(&[_][]const u8{ "curl", "-s", repo_url }, allocator);
     child.stdout_behavior = .Pipe;
     try child.spawn();
-
     var stdout = std.ArrayList(u8).init(allocator);
     defer stdout.deinit();
     try child.stdout.?.reader().readAllArrayList(&stdout, 1024 * 1024);
-
     const status = try child.wait();
     if (status != .Exited or status.Exited != 0) {
         try std.io.getStdErr().writer().print("{s}Failed to fetch repo list{s}\n", .{ Color.red, Color.reset });
         try logMessage("Failed to fetch repo list, exit status: {}", .{status});
         return error.CurlFailed;
     }
-
     try fs.cwd().makePath("/tmp");
-    try fs.cwd().writeFile("/tmp/repo-list.zcr", stdout.items);
+    try fs.cwd().writeFile(.{ .sub_path = "/tmp/repo-list.zcr", .data = stdout.items });
     try logMessage("Saved repo list to /tmp/repo-list.zcr", .{});
-    return stdout.toOwnedSlice();
+    return try stdout.toOwnedSlice();
 }
 
 fn parseRepoList(allocator: Allocator, content: []const u8, package: []const u8) !?[]u8 {
-    var lines = mem.split(u8, content, "\n");
+    var lines = mem.splitSequence(u8, content, "\n");
     while (lines.next()) |line| {
         if (line.len == 0 or line[0] == '#') continue;
-        var parts = mem.split(u8, line, " -> ");
+        var parts = mem.splitSequence(u8, line, " -> ");
         const pkg = parts.next() orelse continue;
         const repo = parts.next() orelse continue;
         if (mem.eql(u8, mem.trim(u8, pkg, " "), package)) {
@@ -170,21 +168,17 @@ fn installPackage(allocator: Allocator, package: []const u8) !void {
     try logMessage("Starting installation of package {s}", .{package});
     const repo_list = try fetchRepoList(allocator);
     defer allocator.free(repo_list);
-
     const repo_url = try parseRepoList(allocator, repo_list, package) orelse {
         try std.io.getStdErr().writer().print("{s}Package '{s}' not found in repository list{s}\n", .{ Color.red, package, Color.reset });
         return;
     };
     defer allocator.free(repo_url);
-
     try std.io.getStdOut().writer().print("{s}Installing package '{s}' from {s}{s}\n", .{ Color.green, package, repo_url, Color.reset });
     try logMessage("Cloning package {s} from {s}", .{ package, repo_url });
-
     const install_dir = try std.fmt.allocPrint(allocator, "/usr/lib/zcr/{s}", .{ package });
     defer allocator.free(install_dir);
     try fs.cwd().makePath(install_dir);
     try logMessage("Created install directory {s}", .{install_dir});
-
     var child = std.process.Child.init(&[_][]const u8{ "git", "clone", repo_url, install_dir }, allocator);
     try child.spawn();
     const status = try child.wait();
@@ -194,26 +188,41 @@ fn installPackage(allocator: Allocator, package: []const u8) !void {
         return;
     }
     try logMessage("Successfully cloned {s} to {s}", .{ package, install_dir });
-
     const unpack_script = try std.fmt.allocPrint(allocator, "{s}/zcr-build-files/unpack.sh", .{ install_dir });
     defer allocator.free(unpack_script);
-    if (fs.cwd().access(unpack_script, .{ .mode = .read_write })) |_| {
-        try std.io.getStdOut().writer().print("{s}Executing unpack.sh for {s}{s}\n", .{ Color.yellow, package, Color.reset });
-        try logMessage("Executing unpack.sh for {s}", .{package});
-        try os.chmod(unpack_script, 0o755);
-        var exec_child = std.process.Child.init(&[_][]const u8{ "sudo", "sh", unpack_script }, allocator);
-        try exec_child.spawn();
-        const exec_status = try exec_child.wait();
-        if (exec_status != .Exited or exec_status.Exited != 0) {
-            try std.io.getStdErr().writer().print("{s}Failed to execute unpack.sh{s}\n", .{ Color.red, Color.reset });
-            try logMessage("Failed to execute unpack.sh for {s}, exit status: {}", .{ package, exec_status });
-        } else {
-            try std.io.getStdOut().writer().print("{s}Package '{s}' installed successfully{s}\n", .{ Color.green, package, Color.reset });
-            try logMessage("Package {s} installed successfully", .{package});
+    var script_exists = true;
+    fs.cwd().access(unpack_script, .{ .mode = .read_only }) catch |err| {
+        switch (err) {
+            error.FileNotFound => {
+                script_exists = false;
+            },
+            else => return err,
         }
-    } else |_| {
+    };
+    if (!script_exists) {
         try std.io.getStdOut().writer().print("{s}No unpack.sh found, package cloned to {s}{s}\n", .{ Color.yellow, install_dir, Color.reset });
         try logMessage("No unpack.sh found for {s}, package cloned to {s}", .{ package, install_dir });
+        return;
+    }
+    try std.io.getStdOut().writer().print("{s}Executing unpack.sh for {s}{s}\n", .{ Color.yellow, package, Color.reset });
+    try logMessage("Executing unpack.sh for {s}", .{package});
+    var chmod_child = std.process.Child.init(&[_][]const u8{ "sudo", "chmod", "+x", unpack_script }, allocator);
+    try chmod_child.spawn();
+    const chmod_status = try chmod_child.wait();
+    if (chmod_status != .Exited or chmod_status.Exited != 0) {
+        try std.io.getStdErr().writer().print("{s}Failed to make unpack.sh executable{s}\n", .{ Color.red, Color.reset });
+        try logMessage("Failed to chmod unpack.sh for {s}, exit status: {}", .{ package, chmod_status });
+        return;
+    }
+    var exec_child = std.process.Child.init(&[_][]const u8{ "sudo", "sh", unpack_script }, allocator);
+    try exec_child.spawn();
+    const exec_status = try exec_child.wait();
+    if (exec_status != .Exited or exec_status.Exited != 0) {
+        try std.io.getStdErr().writer().print("{s}Failed to execute unpack.sh{s}\n", .{ Color.red, Color.reset });
+        try logMessage("Failed to execute unpack.sh for {s}, exit status: {}", .{ package, exec_status });
+    } else {
+        try std.io.getStdOut().writer().print("{s}Package '{s}' installed successfully{s}\n", .{ Color.green, package, Color.reset });
+        try logMessage("Package {s} installed successfully", .{package});
     }
 }
 
@@ -221,13 +230,11 @@ fn findPackage(allocator: Allocator, package: []const u8) !void {
     try logMessage("Searching for package {s}", .{package});
     const repo_list = try fetchRepoList(allocator);
     defer allocator.free(repo_list);
-
     const repo_url = try parseRepoList(allocator, repo_list, package) orelse {
         try std.io.getStdOut().writer().print("{s}Package '{s}' not found{s}\n", .{ Color.red, package, Color.reset });
         return;
     };
     defer allocator.free(repo_url);
-
     try std.io.getStdOut().writer().print("{s}Found package '{s}' at {s}{s}\n", .{ Color.green, package, repo_url, Color.reset });
     try logMessage("Found package {s} at {s}", .{ package, repo_url });
 }
@@ -236,11 +243,20 @@ fn removePackage(allocator: Allocator, package: []const u8) !void {
     try logMessage("Starting removal of package {s}", .{package});
     const install_dir = try std.fmt.allocPrint(allocator, "/usr/lib/zcr/{s}", .{ package });
     defer allocator.free(install_dir);
-
     const remove_script = try std.fmt.allocPrint(allocator, "{s}/zcr-build-files/remove.sh", .{ install_dir });
     defer allocator.free(remove_script);
-
-    if (fs.cwd().access(remove_script, .{ .mode = .read_write })) |_| {
+    var script_exists = true;
+    fs.cwd().access(remove_script, .{ .mode = .read_only }) catch |err| {
+        switch (err) {
+            error.FileNotFound => {
+                script_exists = false;
+                try std.io.getStdOut().writer().print("{s}No remove.sh found, proceeding to delete package directory{s}\n", .{ Color.yellow, Color.reset });
+                try logMessage("No remove.sh found for {s}, proceeding to delete directory", .{package});
+            },
+            else => return err,
+        }
+    };
+    if (script_exists) {
         try std.io.getStdOut().writer().print("{s}Executing remove.sh for {s}{s}\n", .{ Color.yellow, package, Color.reset });
         try logMessage("Executing remove.sh for {s}", .{package});
         var exec_child = std.process.Child.init(&[_][]const u8{ "sudo", "sh", remove_script }, allocator);
@@ -252,11 +268,7 @@ fn removePackage(allocator: Allocator, package: []const u8) !void {
         } else {
             try logMessage("Successfully executed remove.sh for {s}", .{package});
         }
-    } else |_| {
-        try std.io.getStdOut().writer().print("{s}No remove.sh found, proceeding to delete package directory{s}\n", .{ Color.yellow, Color.reset });
-        try logMessage("No remove.sh found for {s}, proceeding to delete directory", .{package});
     }
-
     try fs.cwd().deleteTree(install_dir);
     try std.io.getStdOut().writer().print("{s}Package '{s}' removed successfully{s}\n", .{ Color.green, package, Color.reset });
     try logMessage("Package {s} removed successfully", .{package});
@@ -266,28 +278,29 @@ fn updatePackage(allocator: Allocator, package: []const u8) !void {
     try logMessage("Starting update of package {s}", .{package});
     const install_dir = try std.fmt.allocPrint(allocator, "/usr/lib/zcr/{s}", .{ package });
     defer allocator.free(install_dir);
-
-    if (fs.cwd().access(install_dir, .{ .mode = .read_write })) |_| {
+    fs.cwd().access(install_dir, .{ .mode = .read_only }) catch |err| switch (err) {
+        error.FileNotFound => {
+            try std.io.getStdErr().writer().print("{s}Package '{s}' is not installed{s}\n", .{ Color.red, package, Color.reset });
+            try logMessage("Package {s} is not installed, cannot update", .{package});
+            return;
+        },
+        else => return err,
+    };
         try std.io.getStdOut().writer().print("{s}Updating package '{s}'{s}\n", .{ Color.yellow, package, Color.reset });
         try logMessage("Removing old package directory {s} for update", .{install_dir});
         try fs.cwd().deleteTree(install_dir);
         try installPackage(allocator, package);
-    } else |_| {
-        try std.io.getStdErr().writer().print("{s}Package '{s}' is not installed{s}\n", .{ Color.red, package, Color.reset });
-        try logMessage("Package {s} is not installed, cannot update", .{package});
-    }
 }
 
 fn updateAllPackages(allocator: Allocator) !void {
     try logMessage("Starting update-all operation", .{});
     const repo_list = try fetchRepoList(allocator);
     defer allocator.free(repo_list);
-
-    var lines = mem.split(u8, repo_list, "\n");
+    var lines = mem.splitSequence(u8, repo_list, "\n");
     try std.io.getStdOut().writer().print("{s}Updating all packages...{s}\n", .{ Color.yellow, Color.reset });
     while (lines.next()) |line| {
         if (line.len == 0 or line[0] == '#') continue;
-        var parts = mem.split(u8, line, " -> ");
+        var parts = mem.splitSequence(u8, line, " -> ");
         const pkg = parts.next() orelse continue;
         try updatePackage(allocator, mem.trim(u8, pkg, " "));
     }
@@ -300,13 +313,16 @@ fn autoremove() !void {
     try logMessage("Starting autoremove operation", .{});
     const temp_files = [_][]const u8{ "/tmp/repo-list.zcr" };
     for (temp_files) |file| {
-        if (fs.cwd().access(file, .{ .mode = .read_write })) |_| {
+        fs.cwd().access(file, .{ .mode = .read_only }) catch |err| switch (err) {
+            error.FileNotFound => {
+                try logMessage("Temporary file {s} not found, skipping", .{file});
+                continue;
+            },
+            else => return err,
+        };
             try fs.cwd().deleteFile(file);
             try std.io.getStdOut().writer().print("{s}Removed {s}{s}\n", .{ Color.green, file, Color.reset });
             try logMessage("Removed temporary file {s}", .{file});
-        } else |_| {
-            try logMessage("Temporary file {s} not found, skipping", .{file});
-        }
     }
     try std.io.getStdOut().writer().print("{s}Cleanup completed{s}\n", .{ Color.green, Color.reset });
     try logMessage("Autoremove completed", .{});
