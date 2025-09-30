@@ -12,3 +12,6 @@ In your GitHub repo, create a directory called /zcr-build-files/ and add two scr
 ## - zcr help
 ## - zcr ?
 ## - zcr how-to-add
+
+# Creating your own zcr repo
+You can learn about creating your own zcr repo in: https://github.com/Zenit-Linux/zcr/wiki/Creating-your-own-repository-for-zcr.
