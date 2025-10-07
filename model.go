@@ -109,15 +109,15 @@ func initialModel() *model {
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(blueColor)
 
 	items := []list.Item{
-		item{title: "📦 install {pakiet}", desc: "Install a package"},
-		item{title: "🗑️ remove {pakiet}", desc: "Remove a package"},
-		item{title: "🔄 update {pakiet}", desc: "Update a package"},
-		item{title: "⬆️ upgrade", desc: "Upgrade all packages"},
-		item{title: "🔍 find", desc: "Find packages"},
-		item{title: "♻️ refresh", desc: "Refresh package list"},
-		item{title: "❓ help", desc: "Show help"},
-		item{title: "➕ how-to-add", desc: "How to add your own repo"},
-		item{title: "🚪 exit", desc: "Exit the application"},
+		item{title: "install", desc: "Install a package"},
+		item{title: "remove", desc: "Remove a package"},
+		item{title: "update", desc: "Update a package"},
+		item{title: "upgrade", desc: "Upgrade all packages"},
+		item{title: "find", desc: "Find packages"},
+		item{title: "refresh", desc: "Refresh package list"},
+		item{title: "help", desc: "Show help"},
+		item{title: "how-to-add", desc: "How to add your own repo"},
+		item{title: "exit", desc: "Exit the application"},
 	}
 
 	delegate := list.NewDefaultDelegate()
@@ -162,10 +162,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				selected := m.list.SelectedItem().(item)
 				m.choice = selected.title
 				log.Printf("Selected command: %s", m.choice)
-				if m.choice == "🚪 exit" {
+				if m.choice == "exit" {
 					log.Println("Exiting application")
 					return m, tea.Quit
-				} else if m.choice == "⬆️ upgrade" || m.choice == "♻️ refresh" || m.choice == "❓ help" || m.choice == "➕ how-to-add" {
+				} else if m.choice == "upgrade" || m.choice == "refresh" || m.choice == "help" || m.choice == "how-to-add" {
 					m.state = stateExec
 				} else if m.choice == "🔍 find" {
 					m.state = stateFindQuery
@@ -217,27 +217,27 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 
 							switch m.choice {
-								case "📦 install {pakiet}":
+								case "install":
 									m.err = m.install(m.pakiet)
-								case "🗑️ remove {pakiet}":
+								case "remove":
 									m.err = m.remove(m.pakiet)
-								case "🔄 update {pakiet}":
+								case "update":
 									m.err = m.update(m.pakiet)
-								case "⬆️ upgrade":
+								case "upgrade":
 									m.err = m.upgrade()
-								case "🔍 find":
+								case "find":
 									m.state = stateList
 									return m.find()
-								case "♻️ refresh":
+								case "refresh":
 									m.result = successStyle.Render("Package list refreshed successfully.")
 									m.state = stateResult
 									log.Println("Package list refresh executed")
 									return m, nil
-								case "❓ help":
+								case "help":
 									m.state = stateHelp
 									log.Println("Switched to help state")
 									return m, nil
-								case "➕ how-to-add":
+								case "how-to-add":
 									m.state = stateHowToAdd
 									log.Println("Switched to how-to-add state")
 									return m, nil
@@ -312,15 +312,15 @@ func (m *model) View() string {
 			)
 		case stateHelp:
 			helpText := infoStyle.Render(`Commands:
-			- 📦 install {pakiet}: Installs the package by cloning its repo and running unpack.sh.
-			- 🗑️ remove {pakiet}: Removes the package by running remove.sh and deleting the directory.
-			- 🔄 update {pakiet}: Updates the package to the latest version.
-			- ⬆️ upgrade: Updates all installed packages.
-			- 🔍 find: Searches for packages in the repository list.
-			- ♻️ refresh: Refreshes the package list.
-			- ❓ help: Shows this help.
-			- ➕ how-to-add: Shows how to add your own repository.
-			- 🚪 exit: Exits the application.`)
+			- install: Installs the package by cloning its repo and running unpack.sh.
+			- remove: Removes the package by running remove.sh and deleting the directory.
+			- update: Updates the package to the latest version.
+			- upgrade: Updates all installed packages.
+			- find: Searches for packages in the repository list.
+			- refresh: Refreshes the package list.
+			- help: Shows this help.
+			- how-to-add: Shows how to add your own repository.
+			- exit: Exits the application.`)
 			return fmt.Sprintf(
 				"%s\n\n%s\n\n%s\n\n%s\n\n%s",
 		      header,
