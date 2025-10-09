@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,14 +10,13 @@ import (
 )
 
 var (
-	goldColor   = lipgloss.Color("#FFD700")
-	greenColor  = lipgloss.Color("#00FF00")
-	redColor    = lipgloss.Color("#FF0000")
-	blueColor   = lipgloss.Color("#0000FF")
-	purpleColor = lipgloss.Color("#800080")
-	yellowColor = lipgloss.Color("#FFFF00")
-
-	titleStyle = lipgloss.NewStyle().
+	goldColor    = lipgloss.Color("#FFD700")
+	greenColor   = lipgloss.Color("#00FF00")
+	redColor     = lipgloss.Color("#FF0000")
+	blueColor    = lipgloss.Color("#0000FF")
+	purpleColor  = lipgloss.Color("#800080")
+	yellowColor  = lipgloss.Color("#FFFF00")
+	titleStyle   = lipgloss.NewStyle().
 	Bold(true).
 	Foreground(goldColor).
 	Background(lipgloss.Color("#000000")).
@@ -28,7 +26,6 @@ var (
 	BorderForeground(yellowColor).
 	Align(lipgloss.Center).
 	Width(60)
-
 	subtitleStyle = lipgloss.NewStyle().
 	Bold(true).
 	Foreground(blueColor).
@@ -36,31 +33,26 @@ var (
 	Margin(1, 0).
 	Border(lipgloss.DoubleBorder(), true).
 	BorderForeground(blueColor)
-
 	successStyle = lipgloss.NewStyle().
 	Foreground(greenColor).
 	Bold(true).
 	Padding(1).
 	Border(lipgloss.NormalBorder(), true).
 	BorderForeground(greenColor)
-
 	errorStyle = lipgloss.NewStyle().
 	Foreground(redColor).
 	Bold(true).
 	Padding(1).
 	Border(lipgloss.NormalBorder(), true).
 	BorderForeground(redColor)
-
 	infoStyle = lipgloss.NewStyle().
 	Foreground(purpleColor).
 	Italic(true).
 	Padding(0, 1)
-
 	listStyle = lipgloss.NewStyle().
 	Margin(1, 2).
 	Border(lipgloss.ThickBorder(), true).
 	BorderForeground(goldColor)
-
 	docStyle = lipgloss.NewStyle().Margin(1, 2, 0, 2)
 	headerStyle = lipgloss.NewStyle().Bold(true).Foreground(yellowColor).Align(lipgloss.Center).Margin(1)
 	footerStyle = lipgloss.NewStyle().Foreground(purpleColor).Align(lipgloss.Center).Margin(1)
@@ -69,26 +61,26 @@ var (
 type state string
 
 const (
-	stateMenu       state = "menu"
+	stateMenu      state = "menu"
 	stateInputPakiet state = "input_pakiet"
-	stateFindQuery  state = "find_query"
-	stateExec       state = "exec"
-	stateResult     state = "result"
-	stateHelp       state = "help"
-	stateHowToAdd   state = "how_to_add"
-	stateList       state = "list"
+	stateFindQuery   state = "find_query"
+	stateExec        state = "exec"
+	stateResult      state = "result"
+	stateHelp        state = "help"
+	stateHowToAdd    state = "how_to_add"
+	stateList        state = "list"
 )
 
 type model struct {
-	state     state
-	choice    string
-	pakiet    string
-	query     string
-	result    string
-	list      list.Model
-	textinput textinput.Model
-	packages  map[string]string
-	err       error
+	state      state
+	choice     string
+	pakiet     string
+	query      string
+	result     string
+	list       list.Model
+	textinput  textinput.Model
+	packages   map[string]string
+	err        error
 }
 
 type item struct {
@@ -155,7 +147,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					h, v := docStyle.GetFrameSize()
 					m.list.SetSize(msg.Width-h, msg.Height-v)
 			}
-
 			var cmd tea.Cmd
 			m.list, cmd = m.list.Update(msg)
 			if msg, ok := msg.(tea.KeyMsg); ok && msg.String() == "enter" {
@@ -167,7 +158,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				} else if m.choice == "upgrade" || m.choice == "refresh" || m.choice == "help" || m.choice == "how-to-add" {
 					m.state = stateExec
-				} else if m.choice == "🔍 find" {
+				} else if m.choice == "find" {
 					m.state = stateFindQuery
 					m.textinput.Placeholder = "Enter search query..."
 					m.textinput.Focus()
@@ -180,7 +171,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			return m, cmd
-
 				case stateInputPakiet, stateFindQuery:
 					switch msg := msg.(type) {
 						case tea.KeyMsg:
@@ -206,7 +196,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					var cmd tea.Cmd
 					m.textinput, cmd = m.textinput.Update(msg)
 					return m, cmd
-
 						case stateExec:
 							m.err = m.loadPackages()
 							if m.err != nil {
@@ -215,7 +204,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								m.state = stateResult
 								return m, nil
 							}
-
 							switch m.choice {
 								case "install":
 									m.err = m.install(m.pakiet)
@@ -242,7 +230,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 									log.Println("Switched to how-to-add state")
 									return m, nil
 							}
-
 							if m.err != nil {
 								log.Println("Execution error:", m.err)
 								m.result = errorStyle.Render(fmt.Sprintf("Error: %v", m.err))
@@ -251,7 +238,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 							m.state = stateResult
 							return m, nil
-
 								case stateList:
 									switch msg := msg.(type) {
 										case tea.KeyMsg:
@@ -267,7 +253,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 									var cmd tea.Cmd
 									m.list, cmd = m.list.Update(msg)
 									return m, cmd
-
 										case stateResult, stateHelp, stateHowToAdd:
 											switch msg := msg.(type) {
 												case tea.KeyMsg:
@@ -280,14 +265,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 											}
 											return m, nil
 	}
-
 	return m, nil
 }
 
 func (m *model) View() string {
 	header := headerStyle.Render("ZCR - Zenit Community Repository")
 	footer := footerStyle.Render("Press q to quit | esc to back")
-
 	switch m.state {
 		case stateMenu:
 			return docStyle.Render(header + "\n" + m.list.View() + "\n" + footer)
