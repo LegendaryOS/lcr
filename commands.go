@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/go-git/go-git/v5"
@@ -39,13 +38,11 @@ func downloadRepoList() (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-
 	f, err := os.Create(path)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
-
 	_, err = io.Copy(f, resp.Body)
 	if err != nil {
 		return "", err
@@ -61,7 +58,6 @@ func parseRepoList(path string) (map[string]string, error) {
 		return nil, err
 	}
 	defer f.Close()
-
 	packages := make(map[string]string)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -208,11 +204,9 @@ func (m *model) find() (tea.Model, tea.Cmd) {
 		log.Println("No packages found.")
 		return m, nil
 	}
-
 	delegate := list.NewDefaultDelegate()
 	delegate.Styles.SelectedTitle.Foreground(greenColor).Bold(true)
 	delegate.Styles.NormalTitle.Foreground(goldColor)
-
 	l := list.New(items, delegate, 0, 0)
 	l.Title = "Found Packages"
 	l.Styles.Title = subtitleStyle
