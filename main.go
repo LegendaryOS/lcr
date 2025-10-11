@@ -21,7 +21,7 @@ func main() {
 
 	// Parse command-line arguments
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: zcr <command> [arguments]")
+		fmt.Println("Usage: lcr <command> [arguments]")
 		fmt.Println("Commands: ui, install, remove, update, upgrade, find, refresh")
 		os.Exit(1)
 	}
