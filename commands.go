@@ -31,8 +31,8 @@ func (m *model) loadPackages() error {
 
 func downloadRepoList() (string, error) {
 	log.Println("Downloading repo list...")
-	url := "https://raw.githubusercontent.com/Zenit-Linux/zcr/main/library/repo-list.zcr"
-	path := "/tmp/repo-list.zcr"
+	url := "https://raw.githubusercontent.com/LegendaryOS/lcr/main/library/repo-list.lcr"
+	path := "/tmp/repo-list.lcr"
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
@@ -85,7 +85,7 @@ func (m *model) install(pakiet string) error {
 		log.Println(err)
 		return err
 	}
-	dest := filepath.Join("/usr/lib/zcr", pakiet)
+	dest := filepath.Join("/usr/lib/lcr", pakiet)
 	_, err := git.PlainClone(dest, false, &git.CloneOptions{URL: url})
 	if err != nil {
 		log.Println("Clone error:", err)
@@ -102,7 +102,7 @@ func (m *model) install(pakiet string) error {
 
 func (m *model) runUnpack(dest string) error {
 	log.Println("Running unpack.sh...")
-	buildDir := filepath.Join(dest, "zcr-build-files")
+	buildDir := filepath.Join(dest, "lcr-build-files")
 	unpack := filepath.Join(buildDir, "unpack.sh")
 	err := os.Chmod(unpack, 0755)
 	if err != nil {
@@ -122,8 +122,8 @@ func (m *model) runUnpack(dest string) error {
 
 func (m *model) remove(pakiet string) error {
 	log.Printf("Removing package: %s\n", pakiet)
-	dest := filepath.Join("/usr/lib/zcr", pakiet)
-	buildDir := filepath.Join(dest, "zcr-build-files")
+	dest := filepath.Join("/usr/lib/lcr", pakiet)
+	buildDir := filepath.Join(dest, "lcr-build-files")
 	removeSh := filepath.Join(buildDir, "remove.sh")
 	if _, err := os.Stat(removeSh); err == nil {
 		cmd := exec.Command("/bin/sh", removeSh)
@@ -145,7 +145,7 @@ func (m *model) remove(pakiet string) error {
 
 func (m *model) update(pakiet string) error {
 	log.Printf("Updating package: %s\n", pakiet)
-	dest := filepath.Join("/usr/lib/zcr", pakiet)
+	dest := filepath.Join("/usr/lib/lcr", pakiet)
 	repo, err := git.PlainOpen(dest)
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ func (m *model) update(pakiet string) error {
 
 func (m *model) upgrade() error {
 	log.Println("Upgrading all packages...")
-	dir := "/usr/lib/zcr"
+	dir := "/usr/lib/lcr"
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		return err
