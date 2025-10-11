@@ -1,4 +1,4 @@
-module zcr
+module lcr
 
 go 1.22
 
